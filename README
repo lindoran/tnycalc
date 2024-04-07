@@ -1,0 +1,143 @@
+TNYCALC -
+
+By David (Z80DAD) Collins in 2023
+
+Thanks to Pierre Sarrazin for assistance with adding mc6839 direct linking
+supprt to CMOC, and for assistance with the Makefile.
+
+Thanks to Tim Lindner for his excellent mc6839 wrapper - this code was
+instrumental in getting linker support into CMOC in the first place.
+
+This is a small RPN calculator program for the coco and the assist09 machine
+language monitor.
+
+I built a "slowmath.h" library in C to support some trig functions. since mc6839
+has floating point arithmetic, comparison and BCD conversion but not much in
+the way of trig functions (which are supported by math.h on most modern c
+compilers)
+
+ISSUES:
+
+LOG PERFORMANCE IS VERY SLOW ON THE COCO -- this uses 160 passes through a
+Taylor series -- very slow, also math is computed 8-16 bits at a time
+(depending on the operation)
+
+I did try to use CORDIC but the limitations of both FLOAT and rounding
+performance of the MC6839 Floating Point mask ROM made accuracy an issue.
+
+at this point the LOG functions would need to be re-written in asembly, or
+limit the digits past the decimal point to a less than useful amount (maybe
+the 100ths place) under a 63C09 clocked at 5Mhz E (20Mhz external clock) it's
+decent for a calculator -- most-likely not good enough for games. would need
+machine language and a better algorithm (possibly look-ups -- look-ups =
+memory, we are already using 8k for the mask-rom.)
+
+one idea would be to copy the LOG algorithm from GWBASIC (since it is open
+source) -- at some point I want to look into this to see if the code is at all
+difficult to back port to the 6x09 from its 8086 real mode code. If it's
+basically the same algorithm from Extended Color basic, we might be able to
+use the disassembled source code to come up with a sort of "clean room - open
+source safe" math.h of sorts. The lack of 32bit maths are a huge issue to
+getting floating point code into an 8 bit cpu. its also possible that the
+undocumented 63C09 accumulator could be utilized -- however given the
+additional clock cycles to utilize it it may be a wash compared to just simply
+slogging through the computations in traditional 6809 code -- which would be
+more portable.
+
+COMPILING:
+
+on a properly installed cmoc install with access to make for coco:
+
+make
+
+on a properly installed comc install with access for assist09:
+
+make TARGET=Ast09
+
+manually compile something like (for coco):
+
+cmoc --mc6839 tnycalc-coco.c floatstack.c cocoio.c slowmath.c
+
+or
+
+cmoc --mc6809 --void-target tnycalc-ast09.c ast09.c floatstack.c slowmath.c
+
+RUNNING:
+
+"RUN" the .bin file in xroar under coco machine type. This uses the coco.h
+header so it will not work on the dragon.
+
+I also included a .srec for loading into Jeff Tranters modified Motorola
+Assist09 asembly language monitor. any SBC running that firmware should work.
+
+load the srec in Assist09
+
+L <enter>
+
+{paste srec to terminal}
+
+once loaded
+
+G 0 <enter>
+
+
+DIRECTIONS:
+
+RPN Computes left to right. This is the top two operands on the stack, with
+the bottom one representing the operation on the left.
+
+example
+
+10 <enter>
+2 <enter>
++ <enter>
+
+will change the top of the stack to 12
+
+for more complex problems
+3(2+3)
+
+3 <enter>
+2 <enter>
+3 <enter>
++ <enter>
+* <enter>
+
+top of the stack will equal 15
+
+Single operand operators (trig functions)
+
+enter a number, enter
+
+type '!' then the corresponding function
+
+10 <enter>
+!L <enter> (LOG10)
+
+should return 1.
+
+below is the output help screen when typing "&?"
+
+THE STACK HAS THE SPACE OF 8 OPERANDS,
+OVERFLOW WILL CAUSE A STACK RESET.
+
+TWO OPERAND ARITHMETIC OPERATORS:
+ + <- ADD
+ - <- SUBTRACT
+ * <- MULTIPLY
+ / <- DIVISION
+
+SINGLE OPERAND OPERATORS:(ASSUMES RADIANS)
+ - !R -> SQUARE THE TOP OF THE STACK
+ - !S -> SINE THE TOP OF THE STACK
+ - !C -> COSINE THE TOP OF THE STACK
+ - !T -> TANGENT THE TOP OF THE STACK
+ - !L -> COMPUTE LOG10 OF THE TOP OF THE STACK
+ - !N -> COMPUTE NATURAL LOG OF THE TOP OF THE STACK
+
+NON OPERAND OPERATORS:
+ - &D -> DISPLAY THE STACK
+ - &I -> INITIALIZE THE STACK (AC BUTTON)
+ - &Q -> QUIT
+ - &? -> THIS SCREEN
+
